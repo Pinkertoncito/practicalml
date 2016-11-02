@@ -1,0 +1,73 @@
+---
+title: "Course Project - Practical Machine Learing.  Predict how well exercises were done."
+author: "Lars Bungum"
+date: "1 november 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Preparation
+
+### Download file
+
+```
+fileTrainUrl <- c("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+fileTestingUrl <- c("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+
+download.file(fileTrainUrl, c("/dev/shm/foo"), "wget", quiet = FALSE, mode = "w",
+              cacheOK = TRUE,
+              extra = getOption("download.file.extra"))
+
+training <- read.csv("/home/larsbun/temp/rpr/foo")
+
+download.file(fileTestingUrl, c("/dev/shm/bar"), "wget", quiet = FALSE, mode = "w",
+              cacheOK = TRUE,
+              extra = getOption("download.file.extra"))
+
+testing <- read.csv("/home/larsbun/temp/rpr/bar")              
+```
+### Select colums
+
+First find the number of NA values in each column:
+```
+na_count <-sapply(training, function(y) sum(length(which(is.na(y)))))
+```
+Remove columns that are mostly NA
+```
+training <- training[,na_count < 19216]
+```
+And do the same thing for the test set:
+```
+testing <- testing[,na_count < 19216]
+```
+
+Now filter out nsvs:
+
+```
+nsv<-nearZeroVar(training, saveMetrics=TRUE)
+training <- training[,-(nsv$zeroVar | nsv$nzv)]
+testing <- testing[,-(nsv$zeroVar | nsv$nzv)]
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
