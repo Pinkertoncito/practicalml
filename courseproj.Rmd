@@ -6,24 +6,35 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, cache=TRUE)
 ```
 
 ## Preparation
 
+### Load packages
+
+```{r, include=TRUE}
+library(caret)
+library(doMC)
+library(rpart)
+library(rpart.plot)
+registerDoMC(32)
+```
+
 ### Download file
 
-```
+```{r, include=TRUE}
 fileTrainUrl <- c("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
 fileTestingUrl <- c("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
 
-download.file(fileTrainUrl, c("/dev/shm/foo"), "wget", quiet = FALSE, mode = "w",
+
+download.file(fileTrainUrl, c("/home/larsbun/temp/rpr/foo"), "wget", quiet = FALSE, mode = "w",
               cacheOK = TRUE,
               extra = getOption("download.file.extra"))
 
 training <- read.csv("/home/larsbun/temp/rpr/foo")
 
-download.file(fileTestingUrl, c("/dev/shm/bar"), "wget", quiet = FALSE, mode = "w",
+download.file(fileTestingUrl, c("/home/larsbun/temp/rpr/bar"), "wget", quiet = FALSE, mode = "w",
               cacheOK = TRUE,
               extra = getOption("download.file.extra"))
 
@@ -32,42 +43,87 @@ testing <- read.csv("/home/larsbun/temp/rpr/bar")
 ### Select colums
 
 First find the number of NA values in each column:
-```
+```{r, include=TRUE}
 na_count <-sapply(training, function(y) sum(length(which(is.na(y)))))
 ```
 Remove columns that are mostly NA
-```
+```{r, include=TRUE}
 training <- training[,na_count < 19216]
 ```
 And do the same thing for the test set:
-```
+```{r, include=TRUE}
 testing <- testing[,na_count < 19216]
 ```
 
 Now filter out nsvs:
 
-```
+```{r, include=TRUE}
 nsv<-nearZeroVar(training, saveMetrics=TRUE)
-training <- training[,-(nsv$zeroVar | nsv$nzv)]
-testing <- testing[,-(nsv$zeroVar | nsv$nzv)]
+zerovar <- (nsv$zeroVar | nsv$nzv)
+training <- training[,!zerovar]
+testing <- testing[,!zerovar]
 ```
 
-## R Markdown
+Now remove columns 1-6 that contains usernames, ID and timestamps
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r, include=TRUE}
+training <- training[,7:length(training)]
+testing <- testing[,7:length(testing)]
 ```
 
-## Including Plots
+Subset the training data for analysis on a dev set
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r, include=TRUE}
+devset <- createDataPartition(y=training$classe, p=0.2, list=FALSE)
+devTraining <- training[-devset, ] 
+devTesting <- training[devset, ]
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Analysis
+
+Plot the data for overview
+
+```{r, include=TRUE}
+qplot(training$classe, 
+color=I("red"), 
+fill=I("blue"), 
+xlab="Classes", 
+main="Distribution of classe")
+```
+
+## Training of models
+
+### Decision tree
+```{r, include=TRUE}
+modelRpart <- model1 <- rpart(classe ~ ., data=devTraining, method="class")
+```
+## Evaluation
+```{r, include=TRUE}
+prediction1 <- predict(modelRpart, devTesting, type = "class")
+confusionMatrix(prediction1, devTesting$classe)
+```
+
+# Plot of the Decision Tree
+```{r, include=TRUE}
+rpart.plot(model1, main="Classification Tree", extra=102, under=TRUE, faclen=0)
+```
+
+### Random forest
+
+```{r, include=TRUE}
+modelRf = train(classe ~., method="rf", data=devTraining, allow.parallel=TRUE)
+```
+## Evaluation
+```{r, include=TRUE}
+prediction2 <- predict(modelRf, devTesting, type = "raw")
+confusionMatrix(prediction2, devTesting$classe)
+```
+
+## Predict on the test corpus:
+
+Using rf model since it was more accurate
+
+```{r, include=TRUE}
+predictionTesting <- predict(modelRf, testing, type = "raw")
+predictionTesting
+```
